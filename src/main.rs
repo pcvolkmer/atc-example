@@ -100,7 +100,7 @@ async fn find_codes(query: &str, cache: Cache<String, Vec<AtcCode>>) -> Vec<AtcC
             let similarity = get_similarity(&query, &entry);
             entry.with_similarity(similarity)
         })
-        .filter(|entry| entry.similarity >= 95)
+        .filter(|entry| entry.similarity >= 90)
         .sorted_by(|e1, e2| e2.similarity.cmp(&e1.similarity))
         .take(25)
         .collect::<Vec<_>>();
