@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="de" xmlns="http://www.w3.org/1999/html">
+<head>
+    <meta charset="UTF-8">
+    <title>ATC-Example</title>
+    <style>
+        :root {
+            --blue: #649ed7;
+            --darkblue: #44698E;
+        }
+
+        * {
+            box-sizing: border-box;
+            color: #333;
+            text-align: justify;
+        }
+
+        a {
+            color: var(--blue);
+            text-decoration: none;
+        }
+
+        a:hover {
+            text-decoration: underline;
+        }
+
+        body {
+            margin: 0;
+            font-family: sans-serif;
+            background: #f5f5f5;
+        }
+
+        button, input {
+            padding: .5em 1em;
+            border-radius: 3px;
+            outline: none;
+        }
+
+        button, input {
+            font-size: 1.2em;
+        }
+
+        button {
+            background-color: var(--blue);
+            color: white;
+            border: none;
+            cursor: pointer;
+            display: inline-block;
+        }
+
+        button:hover {
+            background-color: var(--darkblue);
+            box-shadow: 1px 1px 2px #333;
+            text-decoration: none;
+
+            transition: background-color .1s, box-shadow .1s, box-shadow .1s;
+        }
+
+        label:has(> input) {
+            width: 100%;
+        }
+
+        input {
+            width: 100%;
+            border: 1px solid lightgray;
+            box-shadow: inset 1px 1px 4px lightgray;
+
+            transition: box-shadow .1s, border .1s;
+        }
+
+        input:focus {
+            box-shadow: 0 0 3px var(--blue);
+            border: 1px solid var(--blue);
+        }
+
+        header {
+            position: sticky;
+            top: 0;
+
+            padding: 1em 0;
+
+            background: #eee;
+            border-top: 1px solid transparent;
+            border-bottom: 1px solid lightgrey;
+
+            box-shadow: 0 1px 4px lightgrey;
+        }
+
+        header:after {
+            content: ' ';
+            display: block;
+            height: 1em;
+        }
+
+        main {
+            margin: 1em auto;
+            width: 600px;
+        }
+
+        .content {
+            margin: 0 auto;
+            width: 600px;
+        }
+
+        .entry {
+            margin: .5em 0;
+            border: 1px solid lightgray;
+            border-radius: 3px;
+            box-shadow: 1px 1px 4px lightgray;
+            background: white;
+
+            display: grid;
+            grid-template-columns: auto 4em;
+            gap: 1em;
+
+            overflow: hidden;
+        }
+
+        .entry.exact {
+            border-color: #64d76e;
+            background-color: rgba(100, 215, 110, 0.20);
+        }
+
+        .entry.similar {
+            background: repeating-linear-gradient( -45deg, #f5f5f5, #f5f5f5 5px, white 5px, white 25px );
+        }
+
+        .entry div.entry-line {
+            padding: .25em .5em;
+            display: grid;
+            grid-template-columns: 2fr 5fr 1fr;
+            gap: 1em;
+        }
+
+        .entry div.similarity {
+            background: gray;
+            color: white;
+            font-size: large;
+            padding: .8em;
+            margin: 2px;
+            text-align: center;
+            border-radius: 3px;
+        }
+
+        .entry div.similarity.s100 {
+            background-color: green;
+        }
+
+        .form-row {
+            display: flex;
+            gap: 1em;
+        }
+
+        .label {
+            width: fit-content;
+            display: inline-block;
+        }
+
+        .grey-out * {
+            color: darkgray;
+        }
+
+        .key {
+            width: 6em;
+            display: inline-block;
+        }
+
+        .ellipsis {
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow:ellipsis;
+        }
+    </style>
+</head>
+<body>
+    <header class="stickyhead">
+        <div class="content">
+            <h1>Proof of Concept</h1>
+            <h2>Ermitteln von ATC-Codes aus Freitext</h2>
+
+            <p>
+                Ziel ist das Auffinden von ATC-Codes anhand von Freitextangaben.
+                Dabei sollen auch ähnliche Angaben berücksichtigt werden, wenn z.B. ein Tippfehler auftritt.
+            </p>
+
+            <p>
+                Bitte geben Sie einen ATC-Code oder Substanznamen an.
+            </p>
+
+            <form action="" method="get" autocomplete="on">
+
+                <div class="form-row">
+                    <label>
+                        <input type="text" name="q" value="{{ query }}" placeholder="ATC-Code oder Substanzname" list="entries" oninput="updateDatalistDebounced(this.value)"/>
+                    </label>
+                    <button type="submit">Abrufen</button>
+                </div>
+
+                <datalist id="entries">
+                </datalist>
+
+            </form>
+        </div>
+    </header>
+
+    {% if query.trim().len() > 0 %}
+    <main>
+        {% if entries.len() == 0 %}
+        <h3>Es wurde nichts gefunden</h3>
+        {% else if entries.len() == 1 %}
+        <h3>Der folgende eindeutige Treffer wurde gefunden:</h3>
+        {% else if entries.len() < 25 %}
+        <h3>Es gibt {{ entries.len() }} Treffer:</h3>
+        {% else %}
+        <h3>Es gibt mindestens 25 Treffer:</h3>
+        {% endif %}
+        {% for entry in entries %}
+        {% if entries.len() == 1 %}
+        <div class="entry exact">
+        {% else if entry.similarity == 100 %}
+        <div class="entry">
+        {% else %}
+        <div class="entry similar">
+        {% endif %}
+            <div>
+                <div class="entry-line">
+                    <strong class="label">ATC-Code:</strong>
+                    <a href="https://atcddd.fhi.no/atc_ddd_index/?code={{entry.code}}&showdescription=no" target="_blank">{{ entry.code }}</a>
+                </div>
+                <div class="entry-line">
+                    <strong class="label">Name:</strong>
+                    <span class="ellipsis">{{ entry.name }}</span>
+                </div>
+            </div>
+            {% if entry.similarity == 100 %}
+            <div class="similarity s100">
+                ✓
+            </div>
+            {% else %}
+            <div class="similarity">
+                {{ entry.similarity }}&percnt;
+            </div>
+            {% endif %}
+        </div>
+        {% endfor %}
+    </main>
+    {% endif %}
+    <script>
+
+        Array.from(document.getElementsByClassName('key')).forEach(elem => {
+            elem.innerText = [
+                elem.innerText.slice(0,2),
+                elem.innerText.slice(2,3),
+                elem.innerText.slice(3,5),
+                elem.innerText.slice(5,8)
+            ].join(' ');
+        });
+
+        function debounce(func, timeout = 500) {
+            let timer;
+            return (...args) => {
+                clearTimeout(timer);
+                timer = setTimeout(() => { func.apply(this, args); }, timeout);
+            }
+        }
+
+        function updateDatalist(value) {
+            let url = document.location.origin + document.location.pathname;
+            fetch(`${url}?q=${value.trim()}`, { headers: new Headers({ 'Accept': 'application/json' })})
+                .then(res => res.json())
+                .then(sug => {
+                    let entriesElem = document.getElementById('entries');
+                    entriesElem.innerHTML = '';
+                    sug
+                        .map(entry => {
+                            let option = document.createElement('option');
+                            option.value = `${entry['code']} ${entry['name']}`;
+                            option.innerText = `${entry['code']} ${entry['name']}`;
+                            return option;
+                        })
+                        .forEach(option => {
+                            entriesElem.appendChild(option);
+                        });
+                });
+        }
+
+        const updateDatalistDebounced = debounce((value) => updateDatalist(value));
+    </script>
+</body>
+</html>
