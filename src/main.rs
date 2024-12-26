@@ -1,25 +1,25 @@
-use std::collections::HashMap;
-use std::time::Duration;
 use askama_axum::{Response, Template};
 use axum::extract::{Query, State};
 use axum::http::{header, HeaderMap};
-use axum::{Json, Router};
 use axum::response::IntoResponse;
 use axum::routing::get;
+use axum::{Json, Router};
 use csv::{ReaderBuilder, StringRecord};
 use itertools::Itertools;
-use lazy_static::lazy_static;
 use moka::future::Cache;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+use std::sync::LazyLock;
+use std::time::Duration;
 use strsim::jaro_winkler;
 use tower_http::trace::TraceLayer;
 
 static AGS_CSV: &str = include_str!("resources/atc.csv");
 
-lazy_static! {
-    static ref ATC_RE: Regex = Regex::new(r"[ABCDGHJLMNPRSV][0-2][1-9]([A-Z]([A-Z](\\d{2})?)?)?").unwrap();
-}
+static ATC_RE: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"[ABCDGHJLMNPRSV][0-2][1-9]([A-Z]([A-Z](\\d{2})?)?)?").expect("valid regex")
+});
 
 #[derive(Serialize, Deserialize, Clone)]
 struct AtcCode {
@@ -62,19 +62,30 @@ fn all_codes() -> Vec<AtcCode> {
 
 fn get_similarity(query: &str, atc_code: &AtcCode) -> u8 {
     if ATC_RE.is_match(&query.to_ascii_uppercase()) {
-        if query.to_lowercase().starts_with(&atc_code.code.to_lowercase()) {
+        if query
+            .to_lowercase()
+            .starts_with(&atc_code.code.to_lowercase())
+        {
             return 100;
         }
         return 0;
     }
 
-    if query.to_lowercase() == atc_code.name.to_lowercase() || format!("{} {}", atc_code.code.to_lowercase(), atc_code.name.to_lowercase()).starts_with(&query.to_lowercase())
+    if query.to_lowercase() == atc_code.name.to_lowercase()
+        || format!(
+            "{} {}",
+            atc_code.code.to_lowercase(),
+            atc_code.name.to_lowercase()
+        )
+        .starts_with(&query.to_lowercase())
     {
         return 100;
     }
 
-    let sim_code = (100.0 * jaro_winkler(&query.to_lowercase(), &atc_code.code.to_lowercase())) as u8;
-    let sim_name = (100.0 * jaro_winkler(&query.to_lowercase(), &atc_code.name.to_lowercase())) as u8;
+    let sim_code =
+        (100.0 * jaro_winkler(&query.to_lowercase(), &atc_code.code.to_lowercase())) as u8;
+    let sim_name =
+        (100.0 * jaro_winkler(&query.to_lowercase(), &atc_code.name.to_lowercase())) as u8;
 
     if sim_code > sim_name {
         return sim_code;
@@ -118,11 +129,9 @@ async fn negotiate(
     match headers.get(header::ACCEPT) {
         Some(header) => match header.to_str().unwrap_or_default() {
             "application/json" => api_search(state_cache, query).await.into_response(),
-            _ => index(state_cache, query).await.into_response()
+            _ => index(state_cache, query).await.into_response(),
         },
-        _ => {
-            index(state_cache, query).await.into_response()
-        }
+        _ => index(state_cache, query).await.into_response(),
     }
 }
 
@@ -160,9 +169,7 @@ async fn main() {
         .time_to_idle(Duration::from_secs(5 * 60))
         .build();
 
-    let app = Router::new()
-        .route("/", get(negotiate))
-        .with_state(cache);
+    let app = Router::new().route("/", get(negotiate)).with_state(cache);
 
     #[cfg(debug_assertions)]
     let app = app.layer(TraceLayer::new_for_http());
