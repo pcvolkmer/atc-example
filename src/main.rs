@@ -54,8 +54,7 @@ fn all_codes() -> Vec<AtcCode> {
     ReaderBuilder::new()
         .from_reader(AGS_CSV.as_bytes())
         .records()
-        .filter(|record| record.is_ok())
-        .map(|record| record.unwrap())
+        .flatten()
         .map(|record| AtcCode::from_record(&record))
         .collect_vec()
 }
